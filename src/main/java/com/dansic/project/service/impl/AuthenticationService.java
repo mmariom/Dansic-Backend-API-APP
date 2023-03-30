@@ -7,62 +7,51 @@ import com.dansic.project.payload.AuthenticationRequest;
 import com.dansic.project.payload.AuthenticationResponse;
 import com.dansic.project.payload.RegisterRequest;
 import com.dansic.project.entity.Token;
+import com.dansic.project.payload.UpdateUserDetailsDto;
 import com.dansic.project.repo.TokenRepository;
 import com.dansic.project.entity.enums.TokenType;
 import com.dansic.project.entity.enums.Role;
 import com.dansic.project.entity.User;
 import com.dansic.project.repo.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Map;
+
 @Service
-@RequiredArgsConstructor
-public class AuthenticationService   {
-  private final UserRepository repository;
-  private final TokenRepository tokenRepository;
-  private final PasswordEncoder passwordEncoder;
-  private final JwtService jwtService;
-  private final AuthenticationManager authenticationManager;
+public class AuthenticationService {
 
-//  public AuthenticationResponse register(RegisterRequest request) {
-//    var user = User.builder()
-//        .firstname(request.getFirstname())
-//        .lastname(request.getLastname())
-//        .email(request.getEmail())
-//        .password(passwordEncoder.encode(request.getPassword()))
-//        .role(Role.USER)
-//        .build();
-//    var savedUser = repository.save(user);
-//    var jwtToken = jwtService.generateToken(user);
-//    saveUserToken(savedUser, jwtToken);
-//    return AuthenticationResponse.builder()
-//        .token(jwtToken)
-//        .build();
-//  }
-//
-//
+  @Autowired
+  private  UserRepository userRepository;
+  @Autowired
+  private  TokenRepository tokenRepository;
+  @Autowired
+  private  PasswordEncoder passwordEncoder;
+  @Autowired
+  private  JwtService jwtService;
+  @Autowired
+  private  AuthenticationManager authenticationManager;
 
-
-//  private   Post getPostById(Long postId){
-//    return postRepository.findById(postId).orElseThrow(
-//            () -> new ResourceNotFound("Post","Id", postId)
-//    );
-//  }
-
-
-
-  public ResponseEntity register(RegisterRequest registerRequest) {
-    var existingUser = repository.findByEmail(registerRequest.getEmail());
-    if (existingUser.isPresent()) {
+  /**
+   * Register a new user
+   *
+   * @param registerRequest containing user registration information
+   * @return ResponseEntity with the registration result
+   */
+  public ResponseEntity<String> register(RegisterRequest registerRequest) {
+    if (userRepository.findByEmail(registerRequest.getEmail()).isPresent()) {
       throw new UserAlreadyExists(registerRequest.getEmail());
     }
 
-    var userBuild = User.builder()
+    User newUser = User.builder()
             .nickname(registerRequest.getNickname())
             .address(registerRequest.getAddress())
             .zipCode(registerRequest.getZipCode())
@@ -72,63 +61,104 @@ public class AuthenticationService   {
             .role(Role.USER)
             .build();
 
-    repository.save(userBuild);
+    userRepository.save(newUser);
     return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully");
-
-//    var savedUser = repository.save(registerRequest);
-//    var jwtToken = jwtService.generateToken(registerRequest);
-//    saveUserToken(savedUser, jwtToken);
-//    return AuthenticationResponse.builder()
-//            .token(jwtToken)
-//            .build();
-
   }
 
-
-
-
-
-
-  public AuthenticationResponse authenticate(AuthenticationRequest user) {
-
-    var existingUser = repository.findByEmail(user.getEmail()).orElseThrow(() -> new ResourceNotFound("User", "email", user.getEmail()));
+  /**
+   * Authenticate a user
+   *
+   * @param authenticationRequest containing user authentication information
+   * @return AuthenticationResponse with the authentication result
+   */
+  public AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
+    User existingUser = userRepository.findByEmail(authenticationRequest.getEmail())
+            .orElseThrow(() -> new ResourceNotFound("User", "email", authenticationRequest.getEmail()));
 
     authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(
-            user.getEmail(),
-            user.getPassword()
-        )
+            new UsernamePasswordAuthenticationToken(
+                    authenticationRequest.getEmail(),
+                    authenticationRequest.getPassword()
+            )
     );
-    var jwtToken = jwtService.generateToken(existingUser);
+
+    String jwtToken = jwtService.generateToken(existingUser);
     revokeAllUserTokens(existingUser);
     saveUserToken(existingUser, jwtToken);
+
     return AuthenticationResponse.builder()
-        .token(jwtToken)
-        .build();
+            .token(jwtToken)
+            .build();
   }
 
+  /**
+   * Update a user's profile
+   *
+   * @param updateUserDetailsDto containing updated user details
+   * @return ResponseEntity with the update result
+   */
+  public ResponseEntity<String> updateProfile(UpdateUserDetailsDto updateUserDetailsDto) {
+    User currentUser = getCurrentUser();
+
+    if (userRepository.findByEmail(updateUserDetailsDto.getEmail()).isPresent()) {
+      throw new UserAlreadyExists(updateUserDetailsDto.getEmail());
+    }
+
+    currentUser.setAddress(updateUserDetailsDto.getAddress());
+    currentUser.setZipCode(updateUserDetailsDto.getZipCode());
+    currentUser.setPhoneNo(updateUserDetailsDto.getPhoneNo());
+    currentUser.setEmail(updateUserDetailsDto.getEmail());
+
+    userRepository.save(currentUser);
+    return ResponseEntity.status(HttpStatus.OK).body("Profile updated successfully");
+  }
+
+  /**
+   * Update a user's password
+   *
+   * @param currentPassword user's current password
+   * @param newPassword     user's new password
+   * @return ResponseEntity with the update result
+   */
+  public ResponseEntity<Map<String,String>> updatePassword(String currentPassword, String newPassword) {
+    User currentUser = getCurrentUser();
+
+    if (!passwordEncoder.matches(currentPassword, currentUser.getPassword())) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("body", "Current password is incorrect"));
+    }
+
+    currentUser.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(currentUser);
+    return ResponseEntity.status(HttpStatus.OK).body(Map.of("body", "Password updated successfully"));
+  }
+
+  private User getCurrentUser() {
+    return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+  }
+
+
   private void saveUserToken(User user, String jwtToken) {
-    var token = Token.builder()
-        .user(user)
-        .token(jwtToken)
-        .tokenType(TokenType.BEARER)
-        .expired(false)
-        .revoked(false)
-        .build();
+    Token token = Token.builder()
+            .user(user)
+            .token(jwtToken)
+            .tokenType(TokenType.BEARER)
+            .expired(false)
+            .revoked(false)
+            .build();
+
+
     tokenRepository.save(token);
   }
 
   private void revokeAllUserTokens(User user) {
-    var validUserTokens = tokenRepository.findAllValidTokenByUser(user.getId());
-    if (validUserTokens.isEmpty())
+    List<Token> validUserTokens = tokenRepository.findAllValidTokenByUser(user.getId());
+    if (validUserTokens.isEmpty()) {
       return;
+    }
     validUserTokens.forEach(token -> {
       token.setExpired(true);
       token.setRevoked(true);
     });
     tokenRepository.saveAll(validUserTokens);
   }
-
-
-
 }

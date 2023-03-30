@@ -9,6 +9,8 @@ import java.util.Date;
 @Setter
 public class ErrorDetails {
 
+
+
     private Date date;
     private String body;
     private String details;
@@ -18,4 +20,6 @@ public class ErrorDetails {
         this.body = message;
         this.details = details;
     }
+
+    
 }

@@ -24,5 +24,4 @@ public class Condition {
     @OneToMany(mappedBy = "condition")
     private List<Post> posts = new ArrayList<>();
 
-    // constructors, getters, and setters
 }

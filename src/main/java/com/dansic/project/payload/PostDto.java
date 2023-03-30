@@ -27,19 +27,8 @@ public class PostDto {
     private String email;
 
     private String phone;
+
 //    private List<PostImage> images = new ArrayList<>();
 
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PostDto postDto = (PostDto) o;
-        return Objects.equals(title, postDto.title) && Objects.equals(description, postDto.description) && Objects.equals(address, postDto.address) && Objects.equals(category, postDto.category) && Objects.equals(condition, postDto.condition);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(title, description, address, category, condition);
-    }
 }

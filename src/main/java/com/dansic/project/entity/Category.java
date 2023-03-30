@@ -23,10 +23,6 @@ public class Category {
     private List<Post> posts = new ArrayList<>();
 
 
-
-
-
-
 //    @ManyToMany(mappedBy = "categories", cascade = CascadeType.ALL)
 //    private Set<Post> posts = new HashSet<>();
 

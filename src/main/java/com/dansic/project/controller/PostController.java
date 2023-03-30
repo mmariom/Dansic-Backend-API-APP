@@ -62,6 +62,22 @@ public class PostController {
     }
 
 
+    @PutMapping("/secured/updatePost/{id}")
+    public ResponseEntity<PostDto> updatePost(
+            @PathVariable("id") Long postId,
+            @RequestParam("title") String postTitle,
+            @RequestParam("description") String postDescription,
+            @RequestParam("address") String postAddress,
+            @RequestParam("categoryId") Integer categoryId,
+            @RequestParam("condition") Integer condition,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files
+    ) throws Exception {
+        return new ResponseEntity<>(postService.updatePost(postId, postTitle, postDescription, postAddress, categoryId, condition, files), HttpStatus.OK);
+    }
+
+
+
+
     @DeleteMapping("/secured/deletePost/{id}")
     public ResponseEntity<Map<String,String>> deletePostById(@PathVariable("id") Long id) throws Exception{
         postService.deletePostById(id);
@@ -72,3 +88,6 @@ public class PostController {
 
 
 }
+
+
+
